@@ -38,6 +38,7 @@ if [[ ! -d "$input_dir" ]]; then
     exit 1
 fi
 
+
 mkdir -p "$output_dir"
 
 generate_name() {

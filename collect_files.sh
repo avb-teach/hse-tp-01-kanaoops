@@ -51,9 +51,9 @@ generate_name() {
 
     while [[ -e "$output_dir/$dir/$candidate" ]]; do
         if [[ "$base" != "$filename" ]]; then
-            candidate="${base}_${counter}.${ext}"
+            candidate="${base}${counter}.${ext}"
         else
-            candidate="${filename}_${counter}"
+            candidate="${filename}${counter}"
         fi
         ((counter++))
     done
@@ -61,15 +61,13 @@ generate_name() {
     echo "$candidate"
 }
 
-if [[ -n "$max_depth" ]]; then
-    base_depth=$(find "$input_dir" -type d | awk -F/ '{print NF}' | sort -nu | head -n1)
-    max_depth=$((base_depth + max_depth - 1))
-fi
+input_depth=$(echo "$input_dir" | awk -F/ '{print NF}')
 
 find "$input_dir" -type f | while read -r file; do
     file_depth=$(echo "$file" | awk -F/ '{print NF}')
+    relative_depth=$((file_depth - input_depth))
     
-    if [[ -n "$max_depth" && $file_depth -gt $max_depth ]]; then
+    if [[ -n "$max_depth" && $relative_depth -gt "$max_depth" ]]; then
         continue
     fi
 
@@ -78,9 +76,7 @@ find "$input_dir" -type f | while read -r file; do
     
     mkdir -p "$target_dir"
     
-    filename=$(basename "$file")
     unique_name=$(generate_name "$rel_path")
-    
     cp -- "$file" "$target_dir/$unique_name"
 done
 

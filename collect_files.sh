@@ -19,9 +19,9 @@ while [[ $# -gt 0 ]]; do
             ;;
         *)
             if [[ -z "$input_dir" ]]; then
-                input_dir="$1"
+                input_dir=$(realpath -s "$1")
             else
-                output_dir="$1"
+                output_dir=$(realpath -s "$1")
             fi
             shift
             ;;
@@ -38,17 +38,18 @@ if [[ ! -d "$input_dir" ]]; then
     exit 1
 fi
 
-
 mkdir -p "$output_dir"
 
 generate_name() {
-    local filename="$1"
+    local path="$1"
+    local dir=$(dirname "$path")
+    local filename=$(basename "$path")
     local base="${filename%.*}"
     local ext="${filename##*.}"
     local counter=1
     local candidate="$filename"
 
-    while [[ -e "$output_dir/$candidate" ]]; do
+    while [[ -e "$output_dir/$dir/$candidate" ]]; do
         if [[ "$base" != "$filename" ]]; then
             candidate="${base}_${counter}.${ext}"
         else
@@ -60,15 +61,27 @@ generate_name() {
     echo "$candidate"
 }
 
-find_args=("$input_dir" -type f)
 if [[ -n "$max_depth" ]]; then
-    find_args+=(-mindepth 1 -maxdepth "$max_depth")
+    base_depth=$(find "$input_dir" -type d | awk -F/ '{print NF}' | sort -nu | head -n1)
+    max_depth=$((base_depth + max_depth - 1))
 fi
 
-while IFS= read -r -d '' file; do
+find "$input_dir" -type f | while read -r file; do
+    file_depth=$(echo "$file" | awk -F/ '{print NF}')
+    
+    if [[ -n "$max_depth" && $file_depth -gt $max_depth ]]; then
+        continue
+    fi
+
+    rel_path=$(realpath --relative-to="$input_dir" "$file")
+    target_dir="$output_dir/$(dirname "$rel_path")"
+    
+    mkdir -p "$target_dir"
+    
     filename=$(basename "$file")
-    unique_name=$(generate_name "$filename")
-    cp -- "$file" "$output_dir/$unique_name"
-done < <(find "${find_args[@]}" -print0 2>/dev/null)
+    unique_name=$(generate_name "$rel_path")
+    
+    cp -- "$file" "$target_dir/$unique_name"
+done
 
 echo "Files copied successfully to: $output_dir"
